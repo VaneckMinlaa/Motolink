@@ -166,7 +166,7 @@ export default function InscriptionMototaximan() {
         <FontAwesome name="id-card" size={20} color="#07393C" style={styles.inputIcon} />
         <TouchableOpacity style={{ flex: 1 }} onPress={handlePickCni}>
           <Text style={{ color: cniFile ? '#222' : '#888', fontSize: 16 }}>
-            {cniFile ? (cniFile.name || cniFile.uri.split('/').pop()) : 'Téléverser votre CNI (image ou PDF)'}
+            {cniFile ? (cniFile.name || cniFile.uri.split('/').pop()) : 'Téléverser votre CNI'}
           </Text>
         </TouchableOpacity>
         {cniFile && (

@@ -65,6 +65,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     justifyContent: 'center',
+    alignContent: 'center',
   },
   formContainer: {
     padding: 24,

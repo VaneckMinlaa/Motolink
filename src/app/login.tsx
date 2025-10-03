@@ -1,4 +1,4 @@
-import { AntDesign, FontAwesome } from '@expo/vector-icons';
+import { AntDesign, Feather, FontAwesome } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { Link, router } from 'expo-router';
@@ -9,6 +9,7 @@ import getEnvVars from '../config/environment';
 export default function Login() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
@@ -40,28 +41,64 @@ export default function Login() {
 
     try {
       const { API_URL } = getEnvVars();
-      const response = await axios.post(`${API_URL}/login`, {
+      const response = await axios.post(`${API_URL}/api/login`, {
         identifier: identifier,
         mot_de_passe: password,
       });
 
-      const { token } = response.data;
-      await AsyncStorage.setItem('userToken', token);
-      Alert.alert('Succès', 'Connexion réussie.');
-      router.replace('/home'); // Rediriger vers la page d'accueil ou autre
+      const { token, role, message } = response.data;
+      
+      if (token && role) {
+        console.log('Role reçu:', role); // Ajout du console.log pour déboguer
+        await AsyncStorage.setItem('userToken', token);
+        await AsyncStorage.setItem('userRole', role);
+
+        // Gérer la persistance du login
+        if (rememberMe) {
+          await AsyncStorage.setItem('rememberedIdentifier', identifier);
+        } else {
+          await AsyncStorage.removeItem('rememberedIdentifier');
+        }
+        
+        // Redirection basée sur le rôle
+        if (role === 'mototaximan') {
+          console.log('Redirection vers /driver'); // Ajout du console.log pour déboguer
+          router.replace('/driver');
+        } else {
+          console.log('Redirection vers /home'); // Ajout du console.log pour déboguer
+          router.replace('/home');
+        }
+      } else {
+        Alert.alert('Erreur', message || 'Une erreur est survenue lors de la connexion');
+      }
     } catch (error: any) {
       if (error.response) {
         Alert.alert('Erreur', error.response.data.message);
       } else {
-        Alert.alert('Erreur', 'Une erreur est survenue lors de la connexion.');
+        const isNetworkError = !error.response && (error.code === 'ECONNABORTED' || error.message === 'Network Error' || error.request);
+        if (isNetworkError) {
+          try {
+            const existingToken = await AsyncStorage.getItem('userToken');
+            const existingRole = await AsyncStorage.getItem('userRole');
+            const rememberedIdentifier = await AsyncStorage.getItem('rememberedIdentifier');
+            if (existingToken && existingRole && rememberedIdentifier && rememberedIdentifier === identifier) {
+              Alert.alert('Mode hors-ligne', 'Connexion locale avec la dernière session enregistrée. Certaines fonctionnalités peuvent être indisponibles.');
+              if (existingRole === 'mototaximan') {
+                router.replace('/driver');
+              } else {
+                router.replace('/home');
+              }
+              return;
+            }
+          } catch (storageErr) {
+            console.error(storageErr);
+          }
+          Alert.alert('Problème de réseau', "Impossible de joindre le serveur. Vérifiez votre connexion internet ou que l'API est accessible.");
+        } else {
+          Alert.alert('Erreur', 'Une erreur est survenue lors de la connexion.');
+        }
         console.error(error);
       }
-    }
-    // Gérer la persistance du login
-    if (rememberMe) {
-      await AsyncStorage.setItem('rememberedIdentifier', identifier);
-    } else {
-      await AsyncStorage.removeItem('rememberedIdentifier');
     }
   };
 
@@ -72,10 +109,10 @@ export default function Login() {
         <Text style={styles.title}>Connexion</Text>
         <Text style={styles.subtitle}>Connecter vous à votre compte</Text>
         
-        <View style={styles.inputContainer}>
+        <View style={styles.inputWrapper}>
           <FontAwesome name="phone" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
-            style={[styles.input, styles.emailInput]}
+            style={styles.input}
             placeholder="Email ou Numéro de téléphone"
             value={identifier}
             onChangeText={setIdentifier}
@@ -83,15 +120,22 @@ export default function Login() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputWrapper}>
           <FontAwesome name="lock" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
-            style={[styles.input, styles.passwordInput]}
+            style={styles.input}
             placeholder="Entrer votre mot de passe"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
           />
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <Feather 
+              name={showPassword ? "eye" : "eye-off"} 
+              size={20} 
+              color="#07393C" 
+            />
+          </TouchableOpacity>
         </View>
         <TouchableOpacity style={styles.mainButton} onPress={handleLogin}>
           <Text style={styles.mainButtonText}>Connexion</Text>
@@ -175,29 +219,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     textAlign: 'center',
   },
-  inputContainer: {
-    marginBottom: 16,
-    position: 'relative',
-  }, 
-  inputContainers: {
-    marginBottom: 16,
-    position: 'relative',
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f8',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+    height: 48,
   },
   input: {
-    height: 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    fontSize: 14,
-    marginBottom: 16,
-    color: '#000',
-  },
-  emailInput: {
-    marginBottom: 1,
-    paddingRight: 50,
-  },
-  passwordInput: {
-    paddingRight: 50,
+    flex: 1,
+    fontSize: 16,
+    color: '#222',
   },
   inputIcon: {
     marginRight: 8,

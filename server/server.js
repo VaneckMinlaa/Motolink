@@ -5,9 +5,11 @@ const jwt = require('jsonwebtoken');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const http = require('http');
+const setupWebSocketServer = require('./websocket');
 
 const app = express();
-const port = 3001;
+const port = 3002;
 
 const uploadDir = path.join(process.cwd(), 'uploads');
 const db = require('./db');
@@ -15,12 +17,18 @@ const db = require('./db');
 // Pour servir les fichiers uploadés
 app.use('/uploads', express.static(uploadDir));
 
-// Route mototaximan
-const mototaximanRoutes = require('./mototaximan.routes');
-app.use(mototaximanRoutes);
-
-app.use(cors());
+// Routes
 app.use(express.json());
+app.use(cors());
+
+const mototaximanRoutes = require('./mototaximan.routes');
+const authRoutes = require('./auth.routes');
+const ratingRoutes = require('./rating.routes');
+
+app.use(mototaximanRoutes);
+app.use(authRoutes);
+app.use(ratingRoutes);
+
 
 // Middleware d'authentification
 const authenticateToken = (req, res, next) => {
@@ -169,6 +177,12 @@ app.post('/forgot-password', (req, res) => {
 
 
 // Route protégée pour récupérer les informations de l'utilisateur
+// Route pour vérifier la validité du token
+app.get('/api/verify-token', authenticateToken, (req, res) => {
+    // Si le middleware authenticateToken passe, le token est valide
+    res.status(200).json({ valid: true });
+});
+
 app.get('/api/user', authenticateToken, (req, res) => {
     const query = 'SELECT id, nom_complet, email, numero_telephone, photo_url FROM utilisateurs WHERE id = ?';
     db.query(query, [req.user.id], (err, results) => {
@@ -186,6 +200,9 @@ app.get('/', (req, res) => {
     res.send('Hello World!');
 });
 
-app.listen(port, () => {
+const server = http.createServer(app);
+setupWebSocketServer(server);
+
+server.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import getEnvVars from '../config/environment';
 
 export default function Index() {
   const [loading, setLoading] = useState(true);
@@ -11,12 +12,28 @@ export default function Index() {
       try {
         const token = await AsyncStorage.getItem('userToken');
         if (token) {
-          router.replace('/home');
+          // Vérifier si le token est valide en appelant l'API
+          const { API_URL } = getEnvVars();
+          const response = await fetch(`${API_URL}/api/verify-token`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            router.replace('/home');
+          } else {
+            // Si le token n'est pas valide, le supprimer et rediriger vers login
+            await AsyncStorage.removeItem('userToken');
+            router.replace('/login');
+          }
         } else {
           router.replace('/login');
         }
       } catch (e) {
-        console.error('Failed to fetch the token from storage', e);
+        console.error('Failed to verify authentication:', e);
+        // En cas d'erreur, rediriger vers login par sécurité
+        await AsyncStorage.removeItem('userToken');
         router.replace('/login');
       } finally {
         setLoading(false);

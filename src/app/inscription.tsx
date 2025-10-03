@@ -1,9 +1,9 @@
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import axios from 'axios';
 import { Link, router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import getEnvVars from '../config/environment';
-import { FontAwesome } from '@expo/vector-icons';
 
 export default function Inscription() {
   const [nomComplet, setNomComplet] = useState('');
@@ -12,6 +12,8 @@ export default function Inscription() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordsMatch, setPasswordsMatch] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (password || confirmPassword) {
@@ -59,8 +61,8 @@ export default function Inscription() {
         <Text style={styles.title}>Inscription</Text>
         <Text style={styles.subtitle}>Créer votre nouveau compte</Text>
         
-        <View style={styles.inputContainer}>
-          <FontAwesome name="phone" size={20} color="#07393C" style={styles.inputIcon} />
+        <View style={styles.inputWrapper}>
+          <FontAwesome name="user" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
             placeholder="Nom Complet"
@@ -70,18 +72,18 @@ export default function Inscription() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
-          <FontAwesome name="phone" size={20} color="#07393C" style={styles.inputIcon} />
+        <View style={styles.inputWrapper}>
+          <FontAwesome name="envelope" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
-            style={[styles.input, styles.emailInput]}
-            placeholder="Utilisateur@gmail.com (Optionnel)"
+            style={styles.input}
+            placeholder="Utilisateur@gmail.com"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
           />
         </View>
-        <View style={styles.inputContainer}>
+        <View style={styles.inputWrapper}>
           <FontAwesome name="phone" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
             style={styles.input}
@@ -92,31 +94,43 @@ export default function Inscription() {
           />
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputWrapper}>
           <FontAwesome name="lock" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
-            style={[styles.input, styles.passwordInput]}
+            style={styles.input}
             placeholder="Entrer votre mot de passe"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
+            secureTextEntry={!showPassword}
           />
-
+          <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+            <Feather 
+              name={showPassword ? "eye" : "eye-off"} 
+              size={20} 
+              color="#07393C" 
+            />
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.inputWrapper}>
           <FontAwesome name="lock" size={20} color="#07393C" style={styles.inputIcon} />
           <TextInput
             style={[
               styles.input,
-              styles.passwordInput,
               !passwordsMatch && password && confirmPassword ? styles.inputError : null
             ]}
             placeholder="Confirmer votre mot de passe"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
-            secureTextEntry
+            secureTextEntry={!showConfirmPassword}
           />
+          <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+            <Feather 
+              name={showConfirmPassword ? "eye" : "eye-off"} 
+              size={20} 
+              color="#07393C" 
+            />
+          </TouchableOpacity>
           {!passwordsMatch && password && confirmPassword && (
             <Text style={styles.errorText}>Les mots de passe ne correspondent pas</Text>
           )}
@@ -125,16 +139,7 @@ export default function Inscription() {
         <TouchableOpacity style={styles.mainButton} onPress={handleInscription}>
           <Text style={styles.mainButtonText}>Inscription</Text>
         </TouchableOpacity>
-
-        <View style={styles.optionsRow}>
-          <TouchableOpacity style={styles.checkboxContainer}>
-            <View style={styles.checkbox} />
-            <Text style={styles.optionText}>Se rappeller de moi</Text>
-          </TouchableOpacity>
-          <TouchableOpacity>
-            <Text style={styles.optionText}>Mot de Passe Oublié ?</Text>
-          </TouchableOpacity>
-        </View>
+        
         <View style={styles.footer}>
           <Text style={styles.footerText}>Avez vous déjà un compte? </Text>
           <Link href="/login">
@@ -182,24 +187,19 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     textAlign: 'center',
   },
-  inputContainer: {
-    marginBottom: 16,
-    position: 'relative',
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f4f4f8',
+    borderRadius: 12,
+    marginBottom: 15,
+    paddingHorizontal: 10,
+    height: 48,
   },
   input: {
-    height: 50,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#000',
-  },
-  emailInput: {
-    marginBottom: 1,
-    paddingRight: 50,
-  },
-  passwordInput: {
-    paddingRight: 50,
+    flex: 1,
+    fontSize: 16,
+    color: '#222',
   },
   inputIcon: {
     marginRight: 8,

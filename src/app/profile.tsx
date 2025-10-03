@@ -129,7 +129,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4f4f8',
-    paddingTop: 40,
   },
   header: {
     paddingTop: 50,
@@ -140,8 +139,9 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 20,
     marginBottom: 30,
+    paddingHorizontal: 20,
   },
   profileImageContainer: {
     position: 'relative',
@@ -173,13 +173,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 20,
     paddingVertical: 10,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   menuItem: {
     flexDirection: 'row',
@@ -205,7 +198,7 @@ const styles = StyleSheet.create({
     color: '#888',
   },
   logoutButton: {
-    margin: 20,
+    marginBottom: 20,
     padding: 15,
     backgroundColor: '#ff4d4d',
     borderRadius: 15,
