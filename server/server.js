@@ -159,7 +159,7 @@ app.post('/forgot-password', (req, res) => {
                         to: user.email,
                         subject: "Votre nouveau mot de passe",
                         text: `Bonjour, voici votre nouveau mot de passe : ${newPassword}`,
-                        html: `<b>Bonjour,</b><br>Voici votre nouveau mot de passe : <b>${newPassword}</b><br><p>Nous vous recommandons de le changer après vous être connecté.</p>`,
+                        html: `<b>Bonjour,</b><br>Voici votre nouveau mot de passe : <b>${newPassword}</b><br><p>Nous vous recommandons de le changer après vous être connecté.</p><br><p>Cordialement Support Motolink</p></br>`,
                     });
 
                     console.log("Message sent: %s", info.messageId);

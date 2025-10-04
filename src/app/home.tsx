@@ -140,8 +140,20 @@ export default function Home() {
     let interval: ReturnType<typeof setInterval> | null = null;
     const loadAvailableDrivers = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/mototaxi/available`);
+        console.log('Loading drivers from:', `${API_URL}/api/mototaxi/available`);
+        const res = await fetch(`${API_URL}/api/mototaxi/available`, {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
         const data: Driver[] = await res.json();
+        console.log('Loaded drivers:', data);
+        
         if (Array.isArray(data)) {
           setDrivers((prev) => {
             // Fusionner par id pour conserver d'éventuelles mises à jour WS
@@ -152,8 +164,35 @@ export default function Home() {
         }
         setDriversLoadError(false);
       } catch (e) {
+        console.error('Error loading drivers:', e);
         // marquer une erreur réseau pour afficher un message à l'utilisateur
         setDriversLoadError(true);
+        
+        // Fallback: utiliser des données de démonstration si le serveur n'est pas disponible
+        if (drivers.length === 0) {
+          console.log('Using demo drivers as fallback');
+          const demoDrivers: Driver[] = [
+            {
+              id: 'demo1',
+              name: 'Mototaxi Demo 1',
+              rating: 4.5,
+              location: currentLocation ? {
+                latitude: currentLocation.coords.latitude + 0.001,
+                longitude: currentLocation.coords.longitude + 0.001
+              } : { latitude: 3.848, longitude: 11.502 }
+            },
+            {
+              id: 'demo2', 
+              name: 'Mototaxi Demo 2',
+              rating: 4.2,
+              location: currentLocation ? {
+                latitude: currentLocation.coords.latitude - 0.001,
+                longitude: currentLocation.coords.longitude - 0.001
+              } : { latitude: 3.847, longitude: 11.501 }
+            }
+          ];
+          setDrivers(demoDrivers);
+        }
       }
     };
 
@@ -161,22 +200,60 @@ export default function Home() {
     // rafraîchir périodiquement pour capter les nouveaux disponibles
     interval = setInterval(loadAvailableDrivers, 20000);
     return () => { if (interval) clearInterval(interval as any); };
-  }, [API_URL]);
+  }, [API_URL, currentLocation]);
 
   // Charger la liste complète (offline cache)
   useEffect(() => {
     const loadLite = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/mototaxi/list`);
+        console.log('Loading drivers lite from:', `${API_URL}/api/mototaxi/list`);
+        const res = await fetch(`${API_URL}/api/mototaxi/list`, {
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
         const data: DriverLite[] = await res.json();
+        console.log('Loaded drivers lite:', data);
+        
         if (Array.isArray(data)) {
           setDriversLite(data);
           try { await AsyncStorage.setItem('driversLiteCache', JSON.stringify(data)); } catch {}
         }
       } catch (e) {
+        console.error('Error loading drivers lite:', e);
         try {
           const raw = await AsyncStorage.getItem('driversLiteCache');
-          if (raw) setDriversLite(JSON.parse(raw));
+          if (raw) {
+            const cachedData = JSON.parse(raw);
+            console.log('Using cached drivers lite:', cachedData);
+            setDriversLite(cachedData);
+          } else {
+            // Fallback: données de démonstration
+            const demoDriversLite: DriverLite[] = [
+              {
+                id: 'demo1',
+                name: 'Mototaxi Demo 1',
+                phone: '+237 123 456 789',
+                photoUrl: null,
+                rating: 4.5,
+                badge: 'Premium'
+              },
+              {
+                id: 'demo2',
+                name: 'Mototaxi Demo 2', 
+                phone: '+237 987 654 321',
+                photoUrl: null,
+                rating: 4.2,
+                badge: 'Standard'
+              }
+            ];
+            setDriversLite(demoDriversLite);
+          }
         } catch {}
       }
     };
@@ -190,22 +267,62 @@ export default function Home() {
     }
   }, [selectedDriver, estimate]);
 
+  // Sélectionner automatiquement le premier mototaximan disponible quand une destination est définie
+  useEffect(() => {
+    if (destinationCoords && driversLite.length > 0 && !selectedDriver && rideStatus === 'idle') {
+      // Sélectionner le premier mototaximan disponible
+      const firstDriver = driversLite[0];
+      console.log('Auto-selecting first driver:', firstDriver);
+      setSelectedDriver(firstDriver);
+    }
+  }, [destinationCoords, driversLite, selectedDriver, rideStatus]);
+
   // Charger les informations du client
   useEffect(() => {
     const loadClientInfo = async () => {
       try {
-        const name = await AsyncStorage.getItem('userName'); // Assumer que userName est stocké
-        const phone = await AsyncStorage.getItem('userPhone'); // Assumer que userPhone est stocké
-        const userId = await AsyncStorage.getItem('userId'); // Assumer que userId est stocké
-        setClientUserId(userId);
-        setClientName(name);
-        setClientPhone(phone);
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          console.log('No token found, redirecting to login');
+          router.replace('/login');
+          return;
+        }
+
+        console.log('Loading client info from API...');
+        const response = await fetch(`${API_URL}/api/user`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('User data loaded:', userData);
+          
+          // Stocker les informations dans AsyncStorage pour usage futur
+          await AsyncStorage.setItem('userId', String(userData.id));
+          await AsyncStorage.setItem('userName', userData.nom_complet || 'Utilisateur');
+          await AsyncStorage.setItem('userPhone', userData.numero_telephone || '');
+          
+          setClientUserId(String(userData.id));
+          setClientName(userData.nom_complet || 'Utilisateur');
+          setClientPhone(userData.numero_telephone || '');
+        } else {
+          console.error('Failed to load user data:', response.status);
+          // Fallback: utiliser des données par défaut
+          setClientName('Utilisateur');
+          setClientPhone('+237 000 000 000');
+        }
       } catch (e) {
         console.error('Erreur lors du chargement des infos client:', e);
+        // Fallback: utiliser des données par défaut
+        setClientName('Utilisateur');
+        setClientPhone('+237 000 000 000');
       }
     };
     loadClientInfo();
-  }, []);
+  }, [API_URL]);
 
   const handleLogout = async () => {
     try {
@@ -284,8 +401,15 @@ export default function Home() {
       try {
         console.log('Nominatim request URL:', url);
         console.log('Making fetch request...');
-        const res = await fetch(url, { headers: { 'User-Agent': 'motolink-app' } });
+        const res = await fetch(url, { 
+          headers: { 'User-Agent': 'motolink-app' }
+        });
         console.log('Fetch response status:', res.status);
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
         const json = await res.json();
         console.log('Nominatim response:', json);
         console.log('Response length:', json ? json.length : 0);
@@ -302,12 +426,16 @@ export default function Home() {
         console.error('Nominatim autocomplete error:', e);
         // Fallback cache (préfixe)
         const cached = getCachedSuggestions(text);
-        if (cached) setSuggestions(cached);
-        else {
+        if (cached) {
+          console.log('Using cached suggestions:', cached);
+          setSuggestions(cached);
+        } else {
           // Essen fallback Cameroun
           try {
             const url2 = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&accept-language=fr&countrycodes=cm&q=${encodeURIComponent(text + ', Cameroun')}`;
-            const res2 = await fetch(url2, { headers: { 'User-Agent': 'motolink-app' } });
+            const res2 = await fetch(url2, { 
+              headers: { 'User-Agent': 'motolink-app' }
+            });
             const json2 = await res2.json();
             const list2 = (json2 || []).map((p: any) => ({
               id: p.place_id?.toString() || `${p.lat},${p.lon}`,
@@ -316,7 +444,14 @@ export default function Home() {
             }));
             setSuggestions(list2);
             cacheSuggestions(text, list2);
-          } catch {}
+          } catch (e2) {
+            console.error('Fallback Nominatim error:', e2);
+            // Dernier recours : suggestions locales pour le Cameroun
+            const localSuggestions = getLocalSuggestions(text);
+            if (localSuggestions.length > 0) {
+              setSuggestions(localSuggestions);
+            }
+          }
         }
       }
       return;
@@ -468,6 +603,27 @@ export default function Home() {
     return null;
   };
 
+  // Suggestions locales pour le Cameroun (fallback offline)
+  const getLocalSuggestions = (text: string) => {
+    const localPlaces = [
+      { id: 'yaounde', description: 'Yaoundé, Cameroun', coords: { latitude: 3.848, longitude: 11.502 } },
+      { id: 'douala', description: 'Douala, Cameroun', coords: { latitude: 4.048, longitude: 9.704 } },
+      { id: 'bafoussam', description: 'Bafoussam, Cameroun', coords: { latitude: 5.474, longitude: 10.413 } },
+      { id: 'garoua', description: 'Garoua, Cameroun', coords: { latitude: 9.301, longitude: 13.398 } },
+      { id: 'maroua', description: 'Maroua, Cameroun', coords: { latitude: 10.596, longitude: 14.315 } },
+      { id: 'bamenda', description: 'Bamenda, Cameroun', coords: { latitude: 5.959, longitude: 10.155 } },
+      { id: 'bertoua', description: 'Bertoua, Cameroun', coords: { latitude: 4.584, longitude: 14.054 } },
+      { id: 'ebolowa', description: 'Ebolowa, Cameroun', coords: { latitude: 2.933, longitude: 11.150 } },
+      { id: 'kumba', description: 'Kumba, Cameroun', coords: { latitude: 4.636, longitude: 9.447 } },
+      { id: 'limbe', description: 'Limbe, Cameroun', coords: { latitude: 4.016, longitude: 9.207 } }
+    ];
+
+    const lowerText = text.toLowerCase();
+    return localPlaces.filter(place => 
+      place.description.toLowerCase().includes(lowerText)
+    ).slice(0, 5);
+  };
+
   useEffect(() => {
     const loadCache = async () => {
       try {
@@ -479,10 +635,23 @@ export default function Home() {
   }, []);
 
   const handleConfirmRide = async () => {
-    if (!selectedDriver || !currentLocation || !destinationCoords || !clientName || !clientPhone || !destination) {
+    console.log('Confirming ride with:', {
+      selectedDriver: selectedDriver?.name,
+      currentLocation: !!currentLocation,
+      destinationCoords: !!destinationCoords,
+      clientName,
+      clientPhone,
+      destination
+    });
+
+    if (!selectedDriver || !currentLocation || !destinationCoords || !destination) {
       Alert.alert('Erreur', 'Informations de course incomplètes. Veuillez vérifier votre sélection et votre destination.');
       return;
     }
+
+    // Utiliser des valeurs par défaut si les informations client ne sont pas disponibles
+    const finalClientName = clientName || 'Utilisateur';
+    const finalClientPhone = clientPhone || '+237 000 000 000';
 
     if (rideStatus !== 'idle') {
       Alert.alert('Erreur', 'Une course est déjà en cours ou en attente.');
@@ -495,8 +664,8 @@ export default function Home() {
         targetMototaxiId: selectedDriver.id,
         pickup: { latitude: currentLocation.coords.latitude, longitude: currentLocation.coords.longitude },
         destination: destinationCoords,
-        clientName: clientName,
-        clientPhone: clientPhone,
+        clientName: finalClientName,
+        clientPhone: finalClientPhone,
         pickupLabel: pickupLabel,
         destinationLabel: destination,
         estimate: estimate, // Inclure l'estimation pour le mototaximan
@@ -624,6 +793,22 @@ export default function Home() {
         <View style={styles.bottomSheetContent}>
           <Text style={styles.etaText}>Heure d'arrivée estimée</Text>
           <Text style={styles.etaValue}>{formatTime(estimate.durationMin)}</Text>
+          
+          {/* Bouton pour changer de mototaximan */}
+          {driversLite.length > 1 && (
+            <TouchableOpacity 
+              style={styles.changeDriverButton}
+              onPress={() => {
+                const currentIndex = driversLite.findIndex(d => d.id === selectedDriver.id);
+                const nextIndex = (currentIndex + 1) % driversLite.length;
+                setSelectedDriver(driversLite[nextIndex]);
+              }}
+            >
+              <Text style={styles.changeDriverButtonText}>
+                Changer de mototaximan ({driversLite.length} disponible{driversLite.length > 1 ? 's' : ''})
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <View style={styles.driverProposalCard}>
             {selectedDriver.photoUrl ? (
@@ -680,7 +865,16 @@ export default function Home() {
         </View>
       );
     }
-    return null;
+    
+    // Si aucune destination n'est sélectionnée, afficher un message
+    return (
+      <View style={styles.bottomSheetContent}>
+        <Text style={styles.bottomTitle}>Sélectionnez une destination</Text>
+        <Text style={styles.bottomEmpty}>
+          Choisissez votre destination pour voir les mototaximen disponibles.
+        </Text>
+      </View>
+    );
   };
 
   // Composant pour le formulaire de notation
@@ -834,18 +1028,39 @@ export default function Home() {
                 </View>
               )}
               {estimate && (
-                <Text style={styles.estimateText}>
-                  ~ {estimate.distanceKm.toFixed(2)} km • {Math.round(estimate.durationMin)} min
-                </Text>
+                <View>
+                  <Text style={styles.estimateText}>
+                    ~ {estimate.distanceKm.toFixed(2)} km • {Math.round(estimate.durationMin)} min
+                  </Text>
+                  {!selectedDriver && driversLite.length > 0 && (
+                    <TouchableOpacity 
+                      style={styles.selectDriverButton} 
+                      onPress={() => {
+                        const firstDriver = driversLite[0];
+                        setSelectedDriver(firstDriver);
+                        console.log('Manually selecting driver:', firstDriver);
+                      }}
+                    >
+                      <Text style={styles.selectDriverButtonText}>
+                        Choisir un mototaximan ({driversLite.length} disponible{driversLite.length > 1 ? 's' : ''})
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               )}
               {drivers.length === 0 && (
                 <View style={styles.infoBox}>
                   <Text style={styles.infoTitle}>Aucun mototaximan à proximité</Text>
                   <Text style={styles.infoText}>
                     {driversLoadError
-                      ? 'Impossible de charger la disponibilité. Vérifiez votre connexion réseau.'
+                      ? 'Impossible de charger la disponibilité. Vérifiez votre connexion réseau. Mode démonstration activé.'
                       : 'Réessayez dans un instant ou élargissez votre zone.'}
                   </Text>
+                  {driversLoadError && (
+                    <Text style={[styles.infoText, { marginTop: 5, fontStyle: 'italic' }]}>
+                      Les données de démonstration sont utilisées pour tester l'application.
+                    </Text>
+                  )}
                 </View>
               )}
             </View>
@@ -857,7 +1072,7 @@ export default function Home() {
 
       <BottomSheet
         ref={bottomSheetRef}
-        height={350} // Hauteur à ajuster selon le contenu
+        height={400} // Hauteur augmentée pour le nouveau contenu
         openDuration={250}
         closeDuration={250}
         customStyles={{
@@ -1067,6 +1282,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#07393C',
     fontWeight: '600',
+    marginBottom: 10,
+  },
+  selectDriverButton: {
+    backgroundColor: '#07393C',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  selectDriverButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  changeDriverButton: {
+    backgroundColor: '#1E88E5',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  changeDriverButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
   },
   bottomSheetContainer: {
     backgroundColor: 'white',

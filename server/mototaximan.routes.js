@@ -154,4 +154,23 @@ router.get('/api/mototaxi/list', (req, res) => {
   });
 });
 
+// Route pour récupérer l'ID mototaximan depuis l'ID utilisateur
+router.get('/api/mototaxi/id/:userId', (req, res) => {
+  const userId = req.params.userId;
+  const query = 'SELECT id FROM mototaximen WHERE utilisateur_id = ?';
+  
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: 'Erreur lors de la récupération de l\'ID mototaximan' });
+    }
+    
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Mototaximan non trouvé' });
+    }
+    
+    res.json({ mototaxiId: results[0].id });
+  });
+});
+
 module.exports = router;

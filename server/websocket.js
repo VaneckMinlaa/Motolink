@@ -144,13 +144,16 @@ function setupWebSocketServer(server) {
     const targetWs = mototaxiConnections.get(targetMototaxiId);
     if (targetWs) {
       targetWs.send(JSON.stringify({
-        type: 'new_ride_request',
+        type: 'new_request',
         courseId,
         clientId,
         pickup: data.pickup,
         destination: data.destination,
+        pickupLabel: data.pickupLabel,
+        destinationLabel: data.destinationLabel,
         clientName: data.clientName, // Ajouter le nom du client pour le mototaximan
         clientPhone: data.clientPhone, // Ajouter le téléphone du client
+        estimate: data.estimate, // Ajouter l'estimation
       }));
     } else {
       console.warn(`Mototaximan ${targetMototaxiId} non connecté pour la demande de course.`);

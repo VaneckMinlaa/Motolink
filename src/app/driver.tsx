@@ -29,6 +29,7 @@ export default function Driver() {
   const [mototaxiActualId, setMototaxiActualId] = useState<string | null>(null);
   const { sendMessage, updateLocation } = useWebSocket({
     onNewRequest: (data: RideRequestData) => {
+      console.log('Nouvelle demande de course reçue:', data);
       if (!rideRequest && !currentRide) { // Seulement si aucune course n'est déjà en attente/cours
         setRideRequest(data);
         Alert.alert(
@@ -123,23 +124,70 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
   useEffect(() => {
     const getMototaxiId = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId'); // Supposons que l'userId est stocké
-        if (userId) {
-          // Appel API au backend pour obtenir le mototaximan.id depuis utilisateurs.id
-          const token = await AsyncStorage.getItem('userToken');
-          const { API_URL } = getEnvVars();
-          const response = await fetch(`${API_URL}/api/mototaxi/id/${userId}`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          const data = await response.json();
-          if (response.ok && data.mototaxiId) {
-            setMototaxiActualId(String(data.mototaxiId));
-          } else {
-            console.error('Impossible de récupérer le mototaximan ID:', data.message);
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          console.log('No token found, redirecting to login');
+          router.replace('/login');
+          return;
+        }
+
+        console.log('Loading mototaxi ID from API...');
+        const { API_URL } = getEnvVars();
+        const response = await fetch(`${API_URL}/api/user`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('User data loaded:', userData);
+          
+          // Stocker l'userId pour usage futur
+          await AsyncStorage.setItem('userId', String(userData.id));
+          
+          // Appel API au backend pour obtenir le mototaximan.id depuis utilisateurs.id
+          try {
+            const mototaxiResponse = await fetch(`${API_URL}/api/mototaxi/id/${userData.id}`, {
+              headers: { 
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            console.log('Mototaxi response status:', mototaxiResponse.status);
+            
+            if (mototaxiResponse.ok) {
+              const mototaxiData = await mototaxiResponse.json();
+              console.log('Mototaxi data received:', mototaxiData);
+              
+              if (mototaxiData.mototaxiId) {
+                setMototaxiActualId(String(mototaxiData.mototaxiId));
+                console.log('Mototaxi ID set:', mototaxiData.mototaxiId);
+              } else {
+                console.warn('No mototaxiId in response, using userId as fallback');
+                setMototaxiActualId(String(userData.id));
+              }
+            } else {
+              console.error('Mototaxi API error:', mototaxiResponse.status, mototaxiResponse.statusText);
+              // Fallback: utiliser l'userId comme mototaxiId
+              setMototaxiActualId(String(userData.id));
+            }
+          } catch (apiError) {
+            console.error('Error calling mototaxi API:', apiError);
+            // Fallback: utiliser l'userId comme mototaxiId
+            setMototaxiActualId(String(userData.id));
+          }
+        } else {
+          console.error('Failed to load user data:', response.status);
+          // Fallback: utiliser des données par défaut pour permettre le test
+          setMototaxiActualId('demo_mototaxi_id');
         }
       } catch (e) {
         console.error('Erreur lors de la récupération de mototaxiActualId:', e);
+        // Fallback: utiliser des données par défaut pour permettre le test
+        setMototaxiActualId('demo_mototaxi_id');
       }
     };
     getMototaxiId();
@@ -150,6 +198,7 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
   }, []); // Vide car la logique est gérée par les websockets
 
   const toggleAvailability = async (value: boolean) => {
+    console.log('Toggling availability to:', value);
     setIsAvailable(value);
     try {
       const { API_URL } = getEnvVars();
@@ -158,6 +207,9 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
       // await axios.post(`${API_URL}/driver/availability`, { isAvailable: value }, {
       //   headers: { Authorization: `Bearer ${token}` }
       // });
+      
+      // Pour le moment, juste logger le changement
+      console.log('Availability changed to:', value ? 'Available' : 'Unavailable');
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error);
       Alert.alert('Erreur', 'Impossible de mettre à jour votre statut');
@@ -174,7 +226,10 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
     });
     setCurrentRide({ ...rideRequest, status: 'accepted' });
     setRideRequest(null);
-    Alert.alert('Course acceptée', `Vous avez accepté la course de ${rideRequest.clientName}.`);
+    // Désactiver automatiquement la disponibilité
+    setIsAvailable(false);
+    console.log('Disponibilité désactivée après acceptation de course');
+    Alert.alert('Course acceptée', `Vous avez accepté la course de ${rideRequest.clientName}. Votre disponibilité a été désactivée.`);
   };
 
   const handleRejectRequest = () => {
@@ -187,6 +242,7 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
     });
     setRideRequest(null);
     Alert.alert('Demande refusée', `Vous avez refusé la demande de course de ${rideRequest.clientName}.`);
+    // Note: On ne désactive pas la disponibilité lors du refus pour permettre d'autres demandes
   };
 
   const handleStartRide = () => {
@@ -211,6 +267,9 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
     });
     Alert.alert('Course terminée', 'Le trajet est terminé. Merci !');
     setCurrentRide(null);
+    // Réactiver la disponibilité à la fin de la course
+    setIsAvailable(true);
+    console.log('Disponibilité réactivée après fin de course');
   };
 
   const handleLogout = async () => {
@@ -256,33 +315,58 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
           </View>
           <MapView
             style={styles.map}
-            region={{
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            }}
-            showsUserLocation={true}
-            showsMyLocationButton={true}
-            followsUserLocation={true}
+            region={(() => {
+              // Si une course est acceptée, centrer sur la position du client
+              if (currentRide && currentRide.status === 'accepted') {
+                return {
+                  latitude: currentRide.pickup.latitude,
+                  longitude: currentRide.pickup.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                };
+              }
+              
+              // Si une course est en cours, centrer sur la destination
+              if (currentRide && currentRide.status === 'in_progress') {
+                return {
+                  latitude: currentRide.destination.latitude,
+                  longitude: currentRide.destination.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                };
+              }
+              
+              // Par défaut, centrer sur la position du mototaximan
+              return {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              };
+            })()}
+            showsUserLocation={!currentRide} // Ne pas montrer la position GPS si une course est active
+            showsMyLocationButton={!currentRide}
+            followsUserLocation={!currentRide}
             loadingEnabled={true}
             showsCompass={true}
           >
-            {/* Marqueur pour le mototaximan */}
-            <Marker
-              coordinate={{
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-              }}
-              title="Ma position"
-            >
-              <View style={styles.markerContainer}>
-                <MaterialIcons name="motorcycle" size={24} color="#07393C" />
-              </View>
-            </Marker>
+            {/* Marqueur pour le mototaximan - seulement si pas de course active */}
+            {!currentRide && (
+              <Marker
+                coordinate={{
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                }}
+                title="Ma position"
+              >
+                <View style={styles.markerContainer}>
+                  <MaterialIcons name="motorcycle" size={24} color="#07393C" />
+                </View>
+              </Marker>
+            )}
 
-            {/* Marqueurs pour les clients */}
-            {isAvailable && rideRequest && (
+            {/* Marqueur pour la demande de course */}
+            {isAvailable && rideRequest && !currentRide && (
               <Marker
                 coordinate={rideRequest.pickup}
                 title="Demande de course"
@@ -293,19 +377,41 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
                 </View>
               </Marker>
             )}
-            {currentRide && (
-              <Marker
-                coordinate={currentRide.pickup}
-                title="Course en cours"
-                onPress={() => {/* No action for now */}}
-              >
-                <View style={styles.clientMarkerContainer}>
-                  <MaterialIcons name="directions-car" size={24} color="#007BFF" />
-                </View>
-              </Marker>
+
+            {/* Marqueurs pour la course acceptée */}
+            {currentRide && currentRide.status === 'accepted' && (
+              <>
+                <Marker
+                  coordinate={currentRide.pickup}
+                  title="Position du client"
+                >
+                  <View style={styles.clientMarkerContainer}>
+                    <MaterialIcons name="person-pin" size={24} color="#4CAF50" />
+                  </View>
+                </Marker>
+                <Marker
+                  coordinate={currentRide.destination}
+                  title="Destination"
+                >
+                  <View style={styles.destinationMarkerContainer}>
+                    <MaterialIcons name="place" size={24} color="#FF5722" />
+                  </View>
+                </Marker>
+              </>
             )}
-            {currentRide?.destination && (
-              <Marker coordinate={currentRide.destination} title="Destination" pinColor="#07393C" />
+
+            {/* Marqueurs pour la course en cours */}
+            {currentRide && currentRide.status === 'in_progress' && (
+              <>
+                <Marker
+                  coordinate={currentRide.destination}
+                  title="Destination"
+                >
+                  <View style={styles.destinationMarkerContainer}>
+                    <MaterialIcons name="place" size={24} color="#FF5722" />
+                  </View>
+                </Marker>
+              </>
             )}
           </MapView>
           {rideRequest && (
@@ -326,6 +432,15 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
               </View>
             </View>
           )}
+
+          {/* Debug info */}
+          <View style={styles.debugInfo}>
+            <Text style={styles.debugText}>Debug: Mototaxi ID: {mototaxiActualId || 'Non défini'}</Text>
+            <Text style={styles.debugText}>Disponible: {isAvailable ? 'Oui' : 'Non'}</Text>
+            <Text style={styles.debugText}>Demande en attente: {rideRequest ? 'Oui' : 'Non'}</Text>
+            <Text style={styles.debugText}>Course en cours: {currentRide ? `${currentRide.status}` : 'Non'}</Text>
+            <Text style={styles.debugText}>API URL: {getEnvVars().API_URL}</Text>
+          </View>
 
           {currentRide && currentRide.status === 'accepted' && (
             <View style={styles.rideControlCard}>
@@ -436,6 +551,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     borderColor: '#FF6B6B',
+  },
+  destinationMarkerContainer: {
+    backgroundColor: '#fff',
+    padding: 5,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FF5722',
   },
   availabilityContainer: {
     flexDirection: 'row',
@@ -557,5 +679,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 5,
     color: '#333',
+  },
+  debugInfo: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 8,
+    padding: 10,
+    zIndex: 5,
+  },
+  debugText: {
+    color: 'white',
+    fontSize: 12,
+    marginBottom: 2,
   },
 });
