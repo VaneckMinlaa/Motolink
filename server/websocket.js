@@ -11,6 +11,7 @@ function setupWebSocketServer(server) {
   wss.on('connection', (ws) => {
     let userId = null;
     let userType = null;
+    let actualMototaxiId = null; // Stocker l'ID réel du mototaximan
 
     ws.on('message', async (message) => {
       const data = JSON.parse(message);
@@ -25,23 +26,24 @@ function setupWebSocketServer(server) {
             const getMototaximanIdQuery = 'SELECT id FROM mototaximen WHERE utilisateur_id = ?';
             const [motoRows] = await db.promise().query(getMototaximanIdQuery, [userId]);
             if (motoRows.length > 0) {
-              const mototaxiActualId = motoRows[0].id;
-              mototaxiConnections.set(mototaxiActualId, ws); // Utiliser le mototaximan.id
+              actualMototaxiId = motoRows[0].id;
+              mototaxiConnections.set(actualMototaxiId, ws); // Utiliser le mototaximan.id
+              console.log(`Mototaximan authentifié: userId=${userId}, mototaxiId=${actualMototaxiId}`);
             } else {
               console.warn(`Mototaximan avec utilisateur_id ${userId} non trouvé lors de l'authentification.`);
             }
           } else {
             clientConnections.set(userId, ws);
+            console.log(`Client authentifié: userId=${userId}`);
           }
           break;
 
         case 'location_update':
           // Mettre à jour la position du mototaximan
-          if (userType === 'mototaximan' && data.userId) {
-            // userId reçu de la requête du mototaximan (utilisateurs.id)
-            await updateMototaxiPosition(data.userId, data.location);
-            // Informer les clients proches (la diffusion est déjà basée sur mototaxiId interne)
-            // Pas besoin de modifier broadcastLocationToNearbyClients ici, elle utilise mototaxiId directement.
+          if (userType === 'mototaximan' && actualMototaxiId) {
+            await updateMototaxiPosition(actualMototaxiId, data.location);
+            // Informer les клиенты proches
+            broadcastLocationToNearbyClients(actualMototaxiId, data.location);
           }
           break;
 
@@ -54,23 +56,23 @@ function setupWebSocketServer(server) {
 
         case 'accept_ride':
           // Mototaximan accepte une course
-          if (userType === 'mototaximan' && data.mototaxiId) {
-            // mototaxiId est l'ID réel du mototaximan (pas utilisateurs.id)
-            await handleRideAcceptance(data.mototaxiId, data, clientConnections);
+          if (userType === 'mototaximan' && actualMototaxiId) {
+            // Utiliser actualMototaxiId stocké lors de l'authentification
+            await handleRideAcceptance(actualMototaxiId, data, clientConnections);
           }
           break;
         case 'start_ride':
-          if (userType === 'mototaximan' && data.mototaxiId && data.courseId) {
+          if (userType === 'mototaximan' && actualMototaxiId && data.courseId) {
             await handleRideStatusUpdate(data.courseId, 'en_cours', clientConnections, data.clientId);
           }
           break;
         case 'finish_ride':
-          if (userType === 'mototaximan' && data.mototaxiId && data.courseId) {
+          if (userType === 'mototaximan' && actualMototaxiId && data.courseId) {
             await handleRideStatusUpdate(data.courseId, 'terminee', clientConnections, data.clientId);
           }
           break;
         case 'cancel_ride':
-          if (userType === 'mototaximan' && data.mototaxiId && data.courseId) {
+          if (userType === 'mototaximan' && actualMototaxiId && data.courseId) {
             await handleRideStatusUpdate(data.courseId, 'annulee', clientConnections, data.clientId);
           }
           break;
@@ -78,41 +80,26 @@ function setupWebSocketServer(server) {
     });
 
     ws.on('close', () => {
-      if (userType === 'mototaximan') {
-        // Au lieu de userId, il faut trouver le mototaxiActualId pour le supprimer
-        // Cela nécessite une recherche inverse ou un stockage plus complexe. Pour l'instant, on laisse comme ça.
-        // Ou on peut stocker le `mototaxiActualId` dans le `ws` object lors de l'auth pour un cleanup facile.
-        mototaxiConnections.forEach((value, key) => {
-          if (value === ws) {
-            mototaxiConnections.delete(key);
-            console.log(`Mototaximan ${key} déconnecté.`);
-          }
-        });
-      } else {
+      if (userType === 'mototaximan' && actualMototaxiId) {
+        mototaxiConnections.delete(actualMototaxiId);
+        console.log(`Mototaximan ${actualMototaxiId} déconnecté.`);
+      } else if (userType === 'client' && userId) {
         clientConnections.delete(userId);
+        console.log(`Client ${userId} déconnecté.`);
       }
     });
   });
 
   // Fonction pour mettre à jour la position d'un mototaximan
   async function updateMototaxiPosition(mototaxiId, location) {
-      // mototaxiId ici est en fait utilisateurs.id
-      const getMototaxiActualIdQuery = 'SELECT id FROM mototaximen WHERE utilisateur_id = ?';
-      const [motoRows] = await db.promise().query(getMototaxiActualIdQuery, [mototaxiId]);
-      
-      if (motoRows.length > 0) {
-        const actualMototaxiId = motoRows[0].id;
-        const query = `
-          INSERT INTO positions_mototaximen (mototaximan_id, latitude, longitude)
-          VALUES (?, ?, ?)
-          ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude), timestamp = CURRENT_TIMESTAMP;
-        `;
-        await db.promise().query(query, [actualMototaxiId, location.latitude, location.longitude]);
-        // Après la mise à jour de la position, diffuser à tous les clients connectés
-        broadcastLocationToNearbyClients(actualMototaxiId, location);
-      } else {
-        console.warn(`Mototaximan avec utilisateur_id ${mototaxiId} non trouvé pour la mise à jour de position.`);
-      }
+      // mototaxiId côté serveur est maintenant l'ID réel du mototaximan
+      const query = `
+        INSERT INTO positions_mototaximen (mototaximan_id, latitude, longitude)
+        VALUES (?, ?, ?)
+        ON DUPLICATE KEY UPDATE latitude = VALUES(latitude), longitude = VALUES(longitude), timestamp = CURRENT_TIMESTAMP;
+      `;
+      await db.promise().query(query, [mototaxiId, location.latitude, location.longitude]);
+      console.log(`Position mise à jour pour mototaxi ${mototaxiId}: lat=${location.latitude}, lng=${location.longitude}`);
     }
 
   // Fonction pour diffuser la position aux clients proches
@@ -129,21 +116,35 @@ function setupWebSocketServer(server) {
 
   // Fonction pour gérer une demande de course
   async function handleRideRequest(clientId, targetMototaxiId, data, mototaxiConnections) {
-    // Enregistrer la demande dans la base de données avec le mototaximan ciblé
-    const query = 'INSERT INTO courses (client_id, mototaximan_id, position_depart, position_arrivee, statut) VALUES (?, ?, ?, ?, "en_attente")';
-    const result = await db.promise().query(query, [
+    console.log(`Demande de course reçue: client=${clientId}, mototaxi=${targetMototaxiId}`);
+    console.log(`Mototaximen connectés:`, [...mototaxiConnections.keys()]);
+
+    // Traduire l'ID reçu (qui peut être un utilisateur_id) en mototaximen.id réel
+    const translateQuery = 'SELECT id FROM mototaximen WHERE id = ? OR utilisateur_id = ? LIMIT 1';
+    const numericTargetId = Number(targetMototaxiId);
+    const [rows] = await db.promise().query(translateQuery, [numericTargetId, numericTargetId]);
+    if (!rows || rows.length === 0) {
+      console.warn(`Aucun mototaximan trouvé pour l'identifiant ${targetMototaxiId}`);
+      return;
+    }
+    const actualTargetMototaxiId = rows[0].id;
+
+    // Enregistrer la demande dans la base de données avec le mototaximan ciblé (ID réel)
+    const insertQuery = 'INSERT INTO courses (client_id, mototaximan_id, position_depart, position_arrivee, statut) VALUES (?, ?, ?, ?, "en_attente")';
+    const result = await db.promise().query(insertQuery, [
       clientId,
-      targetMototaxiId, // L'ID du mototaximan ciblé
+      actualTargetMototaxiId,
       JSON.stringify(data.pickup),
       JSON.stringify(data.destination)
     ]);
 
     const courseId = result[0].insertId;
+    console.log(`Course créée avec ID: ${courseId}`);
 
-    // Notifier UNIQUEMENT le mototaximan ciblé
-    const targetWs = mototaxiConnections.get(targetMototaxiId);
+    // Notifier UNIQUEMENT le mototaximan ciblé (connexion indexée par mototaximen.id)
+    const targetWs = mototaxiConnections.get(Number(actualTargetMototaxiId));
     if (targetWs) {
-      targetWs.send(JSON.stringify({
+      const requestMessage = {
         type: 'new_request',
         courseId,
         clientId,
@@ -151,13 +152,15 @@ function setupWebSocketServer(server) {
         destination: data.destination,
         pickupLabel: data.pickupLabel,
         destinationLabel: data.destinationLabel,
-        clientName: data.clientName, // Ajouter le nom du client pour le mototaximan
-        clientPhone: data.clientPhone, // Ajouter le téléphone du client
-        estimate: data.estimate, // Ajouter l'estimation
-      }));
+        clientName: data.clientName,
+        clientPhone: data.clientPhone,
+        estimate: data.estimate,
+      };
+      console.log('Envoi de notification au mototaximan:', requestMessage);
+      targetWs.send(JSON.stringify(requestMessage));
     } else {
-      console.warn(`Mototaximan ${targetMototaxiId} non connecté pour la demande de course.`);
-      // Optionnel: informer le client que le mototaximan n'est pas disponible
+      console.warn(`Mototaximan ${actualTargetMototaxiId} non connecté pour la demande de course.`);
+      console.warn(`Vérification typique - Les IDs disponibles:`, [...mototaxiConnections.keys()]);
     }
   }
 

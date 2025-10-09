@@ -12,8 +12,13 @@ router.post('/api/login', (req, res) => {
     return res.status(400).json({ message: 'Tous les champs sont obligatoires.' });
   }
 
-  // Rechercher l'utilisateur par email ou numéro de téléphone
-  const query = 'SELECT * FROM utilisateurs WHERE numero_telephone = ? OR email = ?';
+  // Rechercher l'utilisateur par email ou numéro de téléphone avec vérification du statut mototaximan
+  const query = `
+    SELECT u.*, m.statut as mototaximan_statut 
+    FROM utilisateurs u 
+    LEFT JOIN mototaximen m ON u.id = m.utilisateur_id 
+    WHERE u.numero_telephone = ? OR u.email = ?
+  `;
   db.query(query, [identifier, identifier], (err, results) => {
     if (err) {
       return res.status(500).json({ message: 'Erreur lors de la connexion.' });
@@ -24,6 +29,27 @@ router.post('/api/login', (req, res) => {
     }
 
     const user = results[0];
+    
+    // Vérifier si c'est un mototaximan en attente de validation
+    if (user.role === 'mototaximan' && user.mototaximan_statut === 'en_attente') {
+      return res.status(403).json({ 
+        message: 'Votre inscription est en cours de validation par un administrateur. Vous recevrez une notification une fois approuvée.' 
+      });
+    }
+    
+    // Vérifier si c'est un mototaximan refusé
+    if (user.role === 'mototaximan' && user.mototaximan_statut === 'refuse') {
+      return res.status(403).json({ 
+        message: 'Votre inscription a été refusée. Contactez le support pour plus d\'informations.' 
+      });
+    }
+    
+    // Vérifier si c'est un mototaximan suspendu
+    if (user.role === 'mototaximan' && user.mototaximan_statut === 'suspendu') {
+      return res.status(403).json({ 
+        message: 'Votre compte a été suspendu. Contactez le support pour plus d\'informations.' 
+      });
+    }
     
     bcrypt.compare(mot_de_passe, user.mot_de_passe, (err, isMatch) => {
       if (err) {

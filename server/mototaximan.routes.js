@@ -71,7 +71,20 @@ router.post('/api/inscription-mototaximan', upload.fields([
           db.query('DELETE FROM utilisateurs WHERE id = ?', [userResult.insertId]);
           return res.status(500).json({ message: 'Erreur lors de la création du profil mototaximan.' });
         }
-        res.status(201).json({ message: 'Inscription mototaximan réussie !' });
+        // Créer une notification pour l'admin
+        const notificationQuery = `
+          INSERT INTO notifications_admin (type, mototaximan_id, message)
+          VALUES ('nouvelle_inscription', ?, ?)
+        `;
+        const message = `Nouvelle inscription mototaximan: ${nom_complet} (${numero_telephone})`;
+        
+        db.query(notificationQuery, [motoResult.insertId, message], (err) => {
+          if (err) {
+            console.error('Erreur lors de la création de la notification admin:', err);
+          }
+        });
+        
+        res.status(201).json({ message: 'Inscription mototaximan réussie ! Votre compte sera validé par un administrateur sous peu.' });
       });
     });
   });
@@ -82,7 +95,7 @@ router.get('/api/mototaxi/available', async (req, res) => {
   try {
     const query = `
       SELECT 
-        u.id as utilisateur_id,
+        m.id as mototaximan_id,
         u.nom_complet as name,
         COALESCE(m.note_moyenne, 4.5) as rating,
         latest_pm.latitude AS latitude,
@@ -109,7 +122,7 @@ router.get('/api/mototaxi/available', async (req, res) => {
         return res.status(500).json({ message: 'Erreur lors de la récupération des mototaximen' });
       }
       const drivers = results.map((row) => ({
-        id: String(row.utilisateur_id),
+        id: String(row.mototaximan_id),
         name: row.name,
         rating: Number(row.rating || 4.5),
         location: { latitude: Number(row.latitude), longitude: Number(row.longitude) }

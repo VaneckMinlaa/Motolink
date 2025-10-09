@@ -133,11 +133,12 @@ export function useWebSocket(options: WebSocketHookOptions) {
     });
   };
 
-  const acceptRide = (rideId: string, clientId: string) => {
+  const acceptRide = (courseId: string, clientId: string, mototaxiId: string) => {
     sendMessage({
       type: 'accept_ride',
-      rideId,
-      clientId
+      courseId,
+      clientId,
+      mototaxiId
     });
   };
 

@@ -21,10 +21,19 @@ export default function Index() {
           });
           
           if (response.ok) {
-            router.replace('/home');
+            // Vérifier le rôle pour rediriger vers la bonne page
+            const userRole = await AsyncStorage.getItem('userRole');
+            if (userRole === 'mototaximan') {
+              router.replace('/driver');
+            } else if (userRole === 'admin') {
+              router.replace('/admin');
+            } else {
+              router.replace('/home');
+            }
           } else {
             // Si le token n'est pas valide, le supprimer et rediriger vers login
             await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.removeItem('userRole');
             router.replace('/login');
           }
         } else {
@@ -34,6 +43,7 @@ export default function Index() {
         console.error('Failed to verify authentication:', e);
         // En cas d'erreur, rediriger vers login par sécurité
         await AsyncStorage.removeItem('userToken');
+        await AsyncStorage.removeItem('userRole');
         router.replace('/login');
       } finally {
         setLoading(false);

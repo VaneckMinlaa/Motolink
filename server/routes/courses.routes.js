@@ -24,6 +24,29 @@ router.get('/api/mototaxi/courses/actives', authenticateToken, async (req, res) 
   }
 });
 
+// Route pour créer une nouvelle demande de course
+router.post('/api/courses', authenticateToken, async (req, res) => {
+  const { mototaximan_id, pickup, destination, pickupLabel, destinationLabel, estimate } = req.body;
+  
+  try {
+    const query = 'INSERT INTO courses (client_id, mototaximan_id, position_depart, position_arrivee, statut) VALUES (?, ?, ?, ?, "en_attente")';
+    const result = await db.query(query, [
+      req.user.id,
+      mototaximan_id,
+      JSON.stringify(pickup),
+      JSON.stringify(destination)
+    ]);
+    
+    res.json({ 
+      courseId: result.insertId,
+      message: 'Demande de course créée avec succès' 
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Erreur lors de la création de la demande de course' });
+  }
+});
+
 // Route pour mettre à jour le statut d'une course
 router.put('/api/courses/:courseId/statut', authenticateToken, async (req, res) => {
   const { courseId } = req.params;

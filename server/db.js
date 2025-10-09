@@ -15,7 +15,7 @@ const createTablesQueries = [
     numero_telephone VARCHAR(255) NOT NULL UNIQUE,
     mot_de_passe VARCHAR(255) NOT NULL,
     photo_url VARCHAR(1024),
-    role ENUM('client', 'mototaximan') DEFAULT 'client',
+    role ENUM('client', 'mototaximan', 'admin') DEFAULT 'client',
     reset_token VARCHAR(255),
     reset_token_expires BIGINT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -65,6 +65,29 @@ const createTablesQueries = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (mototaximan_id) REFERENCES mototaximen(id) ON DELETE CASCADE,
     FOREIGN KEY (client_id) REFERENCES utilisateurs(id) ON DELETE CASCADE
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS admin_actions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL,
+    action_type ENUM('validation_mototaximan', 'suspension_utilisateur', 'suppression_utilisateur', 'activation_utilisateur') NOT NULL,
+    target_user_id INT,
+    target_mototaximan_id INT,
+    details JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES utilisateurs(id),
+    FOREIGN KEY (target_user_id) REFERENCES utilisateurs(id),
+    FOREIGN KEY (target_mototaximan_id) REFERENCES mototaximen(id)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS notifications_admin (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('nouvelle_inscription', 'demande_validation') NOT NULL,
+    mototaximan_id INT,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (mototaximan_id) REFERENCES mototaximen(id)
   )`
 ];
 

@@ -24,10 +24,12 @@ app.use(cors());
 const mototaximanRoutes = require('./mototaximan.routes');
 const authRoutes = require('./auth.routes');
 const ratingRoutes = require('./rating.routes');
+const adminRoutes = require('./admin.routes');
 
 app.use(mototaximanRoutes);
 app.use(authRoutes);
 app.use(ratingRoutes);
+app.use(adminRoutes);
 
 
 // Middleware d'authentification

@@ -53,6 +53,13 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="admin"
+        options={{
+          headerShown: false,
+          gestureEnabled: false,
+        }}
+      />
+      <Stack.Screen
         name="login"
         options={{
           title: 'Connexion',

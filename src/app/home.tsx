@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import BottomSheet from 'react-native-raw-bottom-sheet';
 import getEnvVars from '../config/environment';
@@ -721,7 +721,7 @@ export default function Home() {
   const renderBottomSheetContent = () => {
     if (showAllDrivers) {
       return (
-        <View style={styles.bottomSheetContent}>
+        <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={true}>
           <Text style={styles.bottomTitle}>Tous les mototaximen</Text>
           {driversLite.length === 0 ? (
             <Text style={styles.bottomEmpty}>Aucun mototaximan disponible.</Text>
@@ -750,19 +750,19 @@ export default function Home() {
           <TouchableOpacity style={[styles.confirmButton, { marginTop: 10 }]} onPress={() => { setShowAllDrivers(false); bottomSheetRef.current?.close(); }}>
             <Text style={styles.confirmButtonText}>Fermer</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     }
     if (rideStatus === 'completed') {
       return (
-        <View style={styles.bottomSheetContent}>
+        <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={true}>
           <Text style={styles.etaText}>Comment évalueriez-vous votre course ?</Text>
           {/* Placeholder pour le formulaire de notation */}
           <RatingForm onRate={handleRateRide} />
           <TouchableOpacity style={styles.confirmButton} onPress={() => handleRateRide(5, 'Super course !')}>
             <Text style={styles.confirmButtonText}>Soumettre la note (Démo - 5 étoiles)</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     }
 
@@ -773,7 +773,7 @@ export default function Home() {
         'in_progress': 'Course en cours...',
       }[rideStatus];
       return (
-        <View style={styles.bottomSheetContent}>
+        <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={true}>
           <Text style={styles.etaText}>Statut de la course</Text>
           <Text style={styles.etaValue}>{statusText}</Text>
           {/* Ici, on pourrait afficher la position du mototaximan en temps réel */}
@@ -783,32 +783,54 @@ export default function Home() {
               <Text style={styles.cancelButtonText}>Annuler la course</Text>
             </TouchableOpacity>
           )}
-        </View>
+        </ScrollView>
       );
     }
 
     // Contenu par défaut: proposition du mototaximan
     if (selectedDriver && estimate) {
       return (
-        <View style={styles.bottomSheetContent}>
+        <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={true}>
           <Text style={styles.etaText}>Heure d'arrivée estimée</Text>
           <Text style={styles.etaValue}>{formatTime(estimate.durationMin)}</Text>
           
-          {/* Bouton pour changer de mototaximan */}
-          {driversLite.length > 1 && (
-            <TouchableOpacity 
-              style={styles.changeDriverButton}
-              onPress={() => {
-                const currentIndex = driversLite.findIndex(d => d.id === selectedDriver.id);
-                const nextIndex = (currentIndex + 1) % driversLite.length;
-                setSelectedDriver(driversLite[nextIndex]);
-              }}
-            >
-              <Text style={styles.changeDriverButtonText}>
-                Changer de mototaximan ({driversLite.length} disponible{driversLite.length > 1 ? 's' : ''})
-              </Text>
-            </TouchableOpacity>
-          )}
+          {/* Liste horizontale des mototaximen */}
+          <Text style={styles.driversListTitle}>Mototaximen disponibles ({driversLite.length})</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.driversHorizontalScroll}
+            contentContainerStyle={styles.driversScrollContent}
+          >
+            {driversLite.map((driver, index) => (
+              <TouchableOpacity
+                key={driver.id}
+                style={[
+                  styles.driverHorizontalCard,
+                  selectedDriver.id === driver.id && styles.driverHorizontalCardSelected
+                ]}
+                onPress={() => setSelectedDriver(driver)}
+              >
+                {driver.photoUrl ? (
+                  <Image 
+                    source={{ uri: driver.photoUrl.startsWith('http') ? driver.photoUrl : `${API_URL}${driver.photoUrl}` }} 
+                    style={styles.driverHorizontalAvatar} 
+                  />
+                ) : (
+                  <View style={styles.driverHorizontalAvatarPlaceholder}>
+                    <MaterialIcons name="person" size={20} color="#07393C" />
+                  </View>
+                )}
+                <Text style={styles.driverHorizontalName} numberOfLines={1}>{driver.name}</Text>
+                {typeof driver.rating === 'number' && (
+                  <View style={styles.driverHorizontalRating}>
+                    <MaterialIcons name="star" size={12} color="#FFD700" />
+                    <Text style={styles.driverHorizontalRatingText}>{driver.rating.toFixed(1)}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           <View style={styles.driverProposalCard}>
             {selectedDriver.photoUrl ? (
@@ -862,7 +884,7 @@ export default function Home() {
           <TouchableOpacity style={styles.confirmButton} onPress={handleConfirmRide}>
             <Text style={styles.confirmButtonText}>Confirmer la course</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       );
     }
     
@@ -960,7 +982,8 @@ export default function Home() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 paddingHorizontal: 20,
-                paddingTop: 50,
+                paddingTop: 60,
+                paddingBottom: 15,
               }}>
                   <Text style={styles.logo}>Motolink</Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -1297,18 +1320,66 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  changeDriverButton: {
-    backgroundColor: '#1E88E5',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 15,
-    alignItems: 'center',
+  driversListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#07393C',
+    marginBottom: 10,
+    marginTop: 5,
   },
-  changeDriverButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
+  driversHorizontalScroll: {
+    marginBottom: 15,
+  },
+  driversScrollContent: {
+    paddingHorizontal: 5,
+  },
+  driverHorizontalCard: {
+    alignItems: 'center',
+    backgroundColor: '#f8f9fb',
+    borderRadius: 12,
+    padding: 12,
+    marginHorizontal: 5,
+    minWidth: 80,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  driverHorizontalCardSelected: {
+    borderColor: '#07393C',
+    backgroundColor: '#e8f0f0',
+  },
+  driverHorizontalAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  driverHorizontalAvatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#cbd5d5',
+  },
+  driverHorizontalName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#07393C',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  driverHorizontalRating: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  driverHorizontalRatingText: {
+    fontSize: 10,
+    color: '#666',
+    marginLeft: 2,
   },
   bottomSheetContainer: {
     backgroundColor: 'white',
@@ -1318,7 +1389,8 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
   },
   bottomSheetContent: {
-    // Styles pour le contenu global du BottomSheet
+    flex: 1,
+    paddingBottom: 20,
   },
   bottomTitle: {
     fontSize: 18,

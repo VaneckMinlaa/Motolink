@@ -64,6 +64,9 @@ export default function Login() {
         if (role === 'mototaximan') {
           console.log('Redirection vers /driver'); // Ajout du console.log pour déboguer
           router.replace('/driver');
+        } else if (role === 'admin') {
+          console.log('Redirection vers /admin'); // Ajout du console.log pour déboguer
+          router.replace('/admin');
         } else {
           console.log('Redirection vers /home'); // Ajout du console.log pour déboguer
           router.replace('/home');
@@ -85,6 +88,8 @@ export default function Login() {
               Alert.alert('Mode hors-ligne', 'Connexion locale avec la dernière session enregistrée. Certaines fonctionnalités peuvent être indisponibles.');
               if (existingRole === 'mototaximan') {
                 router.replace('/driver');
+              } else if (existingRole === 'admin') {
+                router.replace('/admin');
               } else {
                 router.replace('/home');
               }
