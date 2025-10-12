@@ -173,10 +173,21 @@ function setupWebSocketServer(server) {
     // Notifier le client
     const clientWs = clientConnections.get(data.clientId);
     if (clientWs) {
+      // Récupérer le nom du mototaximan pour l'afficher côté client
+      let mototaxiName = undefined;
+      try {
+        const [rows] = await db.promise().query(
+          'SELECT u.nom_complet as name FROM mototaximen m JOIN utilisateurs u ON m.utilisateur_id = u.id WHERE m.id = ? LIMIT 1',
+          [mototaxiActualId]
+        );
+        if (rows && rows.length > 0) mototaxiName = rows[0].name;
+      } catch {}
+
       clientWs.send(JSON.stringify({
         type: 'ride_accepted',
         courseId: data.courseId,
-        mototaxiId: mototaxiActualId, // Envoyer le bon ID au client
+        mototaxiId: mototaxiActualId,
+        mototaxiName,
       }));
     }
   }
@@ -194,11 +205,33 @@ function setupWebSocketServer(server) {
         if (newStatus === 'en_cours') messageType = 'ride_started';
         if (newStatus === 'terminee') messageType = 'ride_finished';
         if (newStatus === 'annulee') messageType = 'ride_cancelled';
- 
+
+        // Récupérer le mototaximan lié à la course et son nom
+        let mototaxiId = undefined;
+        let mototaxiName = undefined;
+        try {
+          const [courseRows] = await db.promise().query(
+            'SELECT mototaximan_id FROM courses WHERE id = ? LIMIT 1',
+            [courseId]
+          );
+          if (courseRows && courseRows.length > 0) {
+            mototaxiId = courseRows[0].mototaximan_id;
+            const [rows] = await db.promise().query(
+              'SELECT u.nom_complet as name FROM mototaximen m JOIN utilisateurs u ON m.utilisateur_id = u.id WHERE m.id = ? LIMIT 1',
+              [mototaxiId]
+            );
+            if (rows && rows.length > 0) mototaxiName = rows[0].name;
+          }
+        } catch (e) {
+          console.warn('Erreur récupération nom mototaximan pour WS:', e);
+        }
+
         clientWs.send(JSON.stringify({
           type: messageType,
           courseId: courseId,
           status: newStatus,
+          mototaxiId,
+          mototaxiName,
         }));
       }
     } catch (e) {
