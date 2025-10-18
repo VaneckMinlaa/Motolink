@@ -7,9 +7,6 @@ import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } fr
 import getEnvVars from '../config/environment';
 
 const MenuItem = ({ icon, title, subtitle, onPress }: { icon: React.ReactNode, title: string, subtitle: string, onPress?: () => void }) => (
-<<<<<<< HEAD
-  <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-=======
   <TouchableOpacity 
     style={styles.menuItem} 
     onPress={() => {
@@ -17,7 +14,6 @@ const MenuItem = ({ icon, title, subtitle, onPress }: { icon: React.ReactNode, t
       onPress?.();
     }}
   >
->>>>>>> Paiements
     <View style={styles.menuIcon}>{icon}</View>
     <View style={styles.menuTextContainer}>
       <Text style={styles.menuTitle}>{title}</Text>
@@ -101,11 +97,6 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.menuWrapper}>
-<<<<<<< HEAD
-        <MenuItem icon={<MaterialIcons name="payment" size={24} color="#07393C" />} title="Modes de paiement" subtitle="Espèces" />
-        </View>
-        <View style={styles.menuWrapper}>
-=======
         <MenuItem
           icon={<MaterialIcons name="payment" size={24} color="#07393C" />}
           title="Modes de paiement"
@@ -114,7 +105,6 @@ export default function ProfileScreen() {
         />
       </View>
       <View style={styles.menuWrapper}>
->>>>>>> Paiements
         <MenuItem icon={<FontAwesome name="history" size={24} color="#07393C" />} title="Historique" subtitle="Paiement" />
         <MenuItem icon={<Entypo name="location-pin" size={24} color="#07393C" />} title="Trajet" subtitle="Historique" />
       </View>
@@ -141,10 +131,6 @@ export default function ProfileScreen() {
       <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
         <Text style={styles.logoutButtonText}>Déconnexion</Text>
       </TouchableOpacity>
-<<<<<<< HEAD
-
-=======
->>>>>>> Paiements
     </ScrollView>
   );
 }
@@ -248,8 +234,4 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 5,
   },
-<<<<<<< HEAD
 });
-=======
-});
->>>>>>> Paiements
