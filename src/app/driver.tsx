@@ -306,12 +306,6 @@ Durée: ${Math.round(data.estimate.durationMin)} min`
                 thumbColor={isAvailable ? '#07393C' : '#f4f3f4'}
               />
             </View>
-            <TouchableOpacity 
-              style={styles.profileButton} 
-              onPress={() => router.push('/profile')}
-            >
-              <FontAwesome name="user" size={24} color="#07393C" />
-            </TouchableOpacity>
           </View>
           <MapView
             style={styles.map}

@@ -62,19 +62,22 @@ export default function Home() {
       });
     },
     onRideAccepted: (data: any) => {
-      Alert.alert('Course Acceptée', `Le mototaximan ${data.mototaxiId} a accepté votre course.`);
+      const nameOrId = data.mototaxiName || data.mototaxiId;
+      Alert.alert('Course Acceptée', `Le mototaximan ${nameOrId} a accepté votre course.`);
       setRideStatus('accepted');
       setCurrentRide({ courseId: data.courseId, mototaxiId: data.mototaxiId });
       bottomSheetRef.current?.close(); // Fermer le BottomSheet de proposition
     },
     onRideStarted: (data: any) => {
-      Alert.alert('Course Démarrée', `Votre course avec le mototaximan ${data.mototaxiId} a démarré.`);
+      const nameOrId = data.mototaxiName || data.mototaxiId;
+      Alert.alert('Course Démarrée', `Votre course avec le mototaximan ${nameOrId} a démarré.`);
       setRideStatus('in_progress');
     },
     onRideFinished: (data: any) => {
-      Alert.alert('Course Terminée', `Votre course avec le mototaximan ${data.mototaxiId} est terminée. Merci de laisser une note.`);
+      // Afficher directement le BottomSheet de notation à la fin de la course
       setRideStatus('completed');
-      // Afficher l'interface de notation
+      setCurrentRide({ courseId: data.courseId, mototaxiId: data.mototaxiId });
+      bottomSheetRef.current?.open();
     },
     onRideCancelled: (data: any) => {
       Alert.alert('Course Annulée', `La course a été annulée par le mototaximan ${data.mototaxiId}.`);
@@ -308,6 +311,13 @@ export default function Home() {
           setClientUserId(String(userData.id));
           setClientName(userData.nom_complet || 'Utilisateur');
           setClientPhone(userData.numero_telephone || '');
+        } else if (response.status === 401) {
+          try {
+            await AsyncStorage.removeItem('userToken');
+            await AsyncStorage.removeItem('userRole');
+          } catch {}
+          router.replace('/login');
+          return;
         } else {
           console.error('Failed to load user data:', response.status);
           // Fallback: utiliser des données par défaut
@@ -679,6 +689,24 @@ export default function Home() {
     }
   };
 
+  const handleCancelRide = async () => {
+    try {
+      if (currentRide && clientUserId) {
+        sendMessage({
+          type: 'cancel_ride',
+          courseId: currentRide.courseId,
+          clientId: clientUserId,
+          mototaxiId: currentRide.mototaxiId,
+        });
+      }
+    } finally {
+      setRideStatus('idle');
+      setCurrentRide(null);
+      setSelectedDriver(null);
+      bottomSheetRef.current?.close();
+    }
+  };
+
   const handleRateRide = async (rating: number, comment: string) => {
     if (!currentRide || !clientUserId) {
       Alert.alert('Erreur', 'Informations de course ou d\'utilisateur manquantes pour la notation.');
@@ -705,10 +733,24 @@ export default function Home() {
       });
       const data = await response.json();
       if (response.ok) {
-        Alert.alert('Succès', data.message);
+        // Mettre à jour localement la note moyenne du mototaximan si renvoyée par l'API
+        if (currentRide && typeof data.newAverageRating === 'number') {
+          const newAvg = Number(data.newAverageRating);
+          setDriversLite(prev => prev.map(d => d.id === currentRide.mototaxiId ? { ...d, rating: newAvg } : d));
+          setDrivers(prev => prev.map(d => d.id === currentRide.mototaxiId ? { ...d, rating: newAvg } : d));
+        }
         setRideStatus('idle'); // Réinitialiser après la notation
         setCurrentRide(null);
         setSelectedDriver(null);
+        bottomSheetRef.current?.close();
+      } else if (response.status === 401) {
+        try {
+          await AsyncStorage.removeItem('userToken');
+          await AsyncStorage.removeItem('userRole');
+        } catch {}
+        Alert.alert('Session expirée', 'Veuillez vous reconnecter pour soumettre une note.', [
+          { text: 'OK', onPress: () => router.replace('/login') }
+        ]);
       } else {
         Alert.alert('Erreur', data.message || 'Échec de la soumission de la note.');
       }
@@ -757,11 +799,7 @@ export default function Home() {
       return (
         <ScrollView style={styles.bottomSheetContent} showsVerticalScrollIndicator={true}>
           <Text style={styles.etaText}>Comment évalueriez-vous votre course ?</Text>
-          {/* Placeholder pour le formulaire de notation */}
           <RatingForm onRate={handleRateRide} />
-          <TouchableOpacity style={styles.confirmButton} onPress={() => handleRateRide(5, 'Super course !')}>
-            <Text style={styles.confirmButtonText}>Soumettre la note (Démo - 5 étoiles)</Text>
-          </TouchableOpacity>
         </ScrollView>
       );
     }
@@ -779,7 +817,7 @@ export default function Home() {
           {/* Ici, on pourrait afficher la position du mototaximan en temps réel */}
           {/* Ou des infos sur le mototaximan, un bouton d'annulation, etc. */}
           {rideStatus !== 'in_progress' && (
-            <TouchableOpacity style={styles.cancelButton} onPress={() => Alert.alert('Annuler', 'Annuler la course ?')}>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleCancelRide}>
               <Text style={styles.cancelButtonText}>Annuler la course</Text>
             </TouchableOpacity>
           )}

@@ -1,7 +1,7 @@
 // Configuration de l'environnement
 const ENV = {
     development: {
-        API_URL: 'http://10.192.242.12:3002',
+        API_URL: 'http://192.168.1.45:3002',
         GOOGLE_MAPS_API_KEY: 'TA_CLE_API_GOOGLE_ICI', // Remplace par ta vraie clé API
     },
     production: {

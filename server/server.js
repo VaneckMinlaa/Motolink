@@ -41,7 +41,7 @@ const authenticateToken = (req, res, next) => {
         return res.status(401).json({ message: 'Token manquant' });
     }
 
-    jwt.verify(token, 'votre_secret_jwt', (err, user) => {
+    jwt.verify(token, process.env.JWT_SECRET || 'votre_secret_jwt', (err, user) => {
         if (err) {
             return res.status(403).json({ message: 'Token invalide' });
         }
@@ -102,7 +102,7 @@ app.post('/login', (req, res) => {
             }
 
             if (isMatch) {
-                const token = jwt.sign({ id: user.id }, 'votre_secret_jwt', { expiresIn: '1h' });
+                const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'votre_secret_jwt', { expiresIn: '24h' });
                 res.json({ token, message: 'Connexion réussie.' });
             } else {
                 res.status(401).json({ message: 'Mot de passe incorrect.' });

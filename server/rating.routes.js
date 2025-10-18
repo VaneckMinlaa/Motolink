@@ -11,7 +11,7 @@ const verifyToken = (req, res, next) => {
   const token = authHeader.split(' ')[1];
   if (!token) return res.status(401).json({ message: 'Format de token invalide' });
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret', (err, user) => {
+  jwt.verify(token, process.env.JWT_SECRET || 'votre_secret_jwt', (err, user) => {
     if (err) return res.status(403).json({ message: 'Token invalide' });
     req.user = user; // Contient { id, role }
     next();
@@ -66,7 +66,7 @@ router.post('/api/ratings', verifyToken, async (req, res) => {
       [newAverageRating.toFixed(2), mototaximanId]
     );
 
-    res.status(201).json({ message: 'Évaluation soumise avec succès et note moyenne mise à jour.' });
+    res.status(201).json({ message: 'Évaluation soumise avec succès et note moyenne mise à jour.', newAverageRating });
 
   } catch (err) {
     console.error('Erreur lors de la soumission de l\'évaluation:', err);
