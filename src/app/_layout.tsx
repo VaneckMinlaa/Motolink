@@ -110,6 +110,14 @@ export default function RootLayout() {
         }}
       />
       <Stack.Screen
+        name="payment-methods"
+        options={{
+          title: 'Méthodes de paiement',
+          headerTitle: '',
+          headerTransparent: true,
+        }}
+      />
+      <Stack.Screen
         name="driver"
         options={{
           headerShown: false,

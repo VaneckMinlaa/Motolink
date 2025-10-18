@@ -3,5 +3,10 @@
     "source.fixAll": "explicit",
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
+<<<<<<< HEAD
   }
+=======
+  },
+  "typescript.autoClosingTags": false
+>>>>>>> Paiements
 }
