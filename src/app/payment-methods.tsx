@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#28a745',
+    color: '#07393C',
     marginTop: 24,
     marginBottom: 24,
   },
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   nextButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#07393C',
     paddingVertical: 16,
     paddingHorizontal: 20,
     alignItems: 'center',
